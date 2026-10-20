@@ -249,7 +249,7 @@ kubectl get svc -n monitoring
 kubectl get prometheusrules -n monitoring
 ```
 
-## 12. Скриншоты для отчёта
+## 12. Скриншоты
 
 Рекомендуется приложить следующие скриншоты:
 
