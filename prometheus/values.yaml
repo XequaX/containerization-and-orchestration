@@ -1,0 +1,19 @@
+grafana:
+  enabled: true
+  adminUser: admin
+  adminPassword: monitoring123
+
+prometheus:
+  prometheusSpec:
+    scrapeInterval: 15s
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    additionalScrapeConfigs:
+      - job_name: api
+        metrics_path: /metrics
+        static_configs:
+          - targets:
+              - api.monitoring.svc.cluster.local:8000
+
+alertmanager:
+  enabled: true

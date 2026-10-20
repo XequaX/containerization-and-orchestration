@@ -1,0 +1,49 @@
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: api-alert-rules
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+    - name: api-alerts
+      rules:
+        - alert: HighErrorRate
+          expr: |
+            (
+              sum(rate(api_requests_total{status=~"5.."}[5m]))
+              /
+              clamp_min(sum(rate(api_requests_total[5m])), 1e-9)
+            ) > 0.05
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Высокая доля ошибок API"
+            description: "Доля HTTP 5xx превышает 5% в течение 1 минуты."
+
+        - alert: HighRequestLatency
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum by (le) (
+                rate(api_request_duration_seconds_bucket[5m])
+              )
+            ) > 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Высокая задержка API"
+            description: "95-й перцентиль задержки запросов превышает 1 секунду."
+
+        - alert: ApiDown
+          expr: absent(up{job="api"}) or up{job="api"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "API недоступен"
+            description: "Prometheus не получает метрики API."

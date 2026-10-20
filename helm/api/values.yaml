@@ -1,0 +1,22 @@
+replicaCount: 1
+
+image:
+  repository: monitoring-api
+  tag: v1
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+env:
+  selfUrl: "http://127.0.0.1:8000"
+  otelEndpoint: ""

@@ -1,0 +1,24 @@
+
+replicaCount: 1
+
+configMap:
+  enabled: true
+  rawConfig:
+    alertmanager:
+      interval: 30s
+      servers:
+        - name: monitoring
+          uri: http://monitoring-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093
+          timeout: 10s
+          proxy: true
+    listen:
+      address: "0.0.0.0"
+      port: 8080
+      prefix: /
+    log:
+      level: info
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: http
