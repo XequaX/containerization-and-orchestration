@@ -1,0 +1,37 @@
+groups:
+  - name: mydocker-api-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(api_errors_total[1m]))
+          /
+          clamp_min(sum(rate(api_requests_total[1m])), 1e-9)
+          > 0.05
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Высокая доля ошибок API"
+          description: "Доля HTTP 5xx превышает 5% в течение 30 секунд."
+
+      - alert: HighRequestLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(api_request_duration_seconds_bucket[5m]))
+          ) > 1
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Высокая задержка API"
+          description: "95-й перцентиль времени ответа превышает 1 секунду."
+
+      - alert: ApiDown
+        expr: up{job="mydocker-api"} == 0
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "API недоступен"
+          description: "Prometheus не может получить метрики API."
