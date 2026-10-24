@@ -47,12 +47,6 @@ docker compose version
 runsc --version
 ```
 
-Перейти в каталог проекта:
-
-```bash
-cd ~/labs/lab1
-```
-
 ## 4. API
 
 Запущенный контейнер API доступен на порту `8001` хоста. Проверка:
@@ -87,14 +81,14 @@ unshare --user --map-root-user --pid --fork sh -c \
 
 Внутри PID namespace процесс получает PID 1. В отдельном network namespace изначально виден только интерфейс `lo`; для сетевого взаимодействия его требуется поднять.
 
-Пример запуска оболочки в нескольких namespaces:
+Запуск оболочки в нескольких namespace:
 
 ```bash
 unshare --user --map-root-user --mount --net --uts --ipc --pid --fork --mount-proc sh
 ```
 
 
-## 6. cgroups v2
+## 6. cgroups
 
 В системе доступны контроллеры `cpu`, `memory` и `pids`. Для тестовой группы применялись следующие ограничения:
 
@@ -111,9 +105,9 @@ unshare --user --map-root-user --mount --net --uts --ipc --pid --fork --mount-pr
 cat /sys/fs/cgroup/cgroup.controllers
 ```
 
-При тестировании CPU в `cpu.stat` увеличивались `nr_throttled` и `throttled_usec`, что подтверждает срабатывание ограничения CPU. При тесте памяти процесс был завершён OOM-механизмом; в `memory.events` увеличились счётчики `oom` и `oom_kill`. При тесте `pids.max` создание дополнительного процесса завершилось ошибкой `Resource temporarily unavailable`.
+При тестировании CPU в `cpu.stat` увеличивались `nr_throttled` и `throttled_usec`, что подтверждает срабатывание ограничения CPU. При тесте памяти процесс был завершён OOM-killerом; в `memory.events` увеличились счётчики `oom` и `oom_kill`. При тесте `pids.max` создание дополнительного процесса завершилось ошибкой `Resource temporarily unavailable`.
 
-## 7. Скрипт mydocker.sh
+## 7. mydocker.sh
 
 Скрипт `mydocker.sh` запускает API с заданными ограничениями cgroups и использует namespaces для изоляции процесса.
 
@@ -143,7 +137,7 @@ docker build -t mydocker-api:latest .
 docker images mydocker-api:latest
 ```
 
-В ходе сборки размер образа составлял около 249 MB на диске (значение может отличаться в зависимости от версии образа и Docker).
+В ходе сборки размер образа составлял около 249 MB.
 
 ## 10. Запуск контейнера с Docker
 
@@ -180,8 +174,6 @@ docker run --rm \
   sh -c 'echo "Hello from Docker volume" > /data/volume-test.txt && cat /data/volume-test.txt'
 ```
 
-Файл появлялся в каталоге `data` на хосте, что подтверждает совместное использование данных через bind mount.
-
 ## 12. gVisor
 
 Установлен `runsc` и зарегистрирован в локальном Docker Engine как дополнительная среда выполнения. Проверка версии:
@@ -207,7 +199,7 @@ docker inspect mydocker-api-gvisor \
 curl -i --max-time 5 http://127.0.0.1:8001/health
 ```
 
-В проверке контейнер был запущен с `Runtime=runsc` и возвращал HTTP 200. У gVisor в текущем окружении не отображались доступные из контейнера файлы cgroup, а cAdvisor не предоставлял метрику throttling для `mydocker-api-gvisor`; это ограничение учитывается при анализе мониторинга.
+В проверке контейнер был запущен с `Runtime=runsc` и возвращал HTTP 200. У gVisor в текущем окружении не отображались доступные из контейнера файлы cgroup, а cAdvisor не предоставлял метрику throttling для `mydocker-api-gvisor`.
 
 ## 13. Prometheus и Grafana
 
@@ -227,30 +219,7 @@ docker compose ps
 
 В Grafana настроен источник данных Prometheus с URL `http://prometheus:9090`. Дашборд `MyDocker API Monitoring` содержит метрики API и контейнера: RPS, долю ошибок, p95 latency, потребление памяти, использование CPU и скорость использования процессорного времени.
 
-Примеры PromQL:
-
-RPS:
-
-```promql
-sum(rate(api_requests_total[1m]))
-```
-
-Доля ошибок:
-
-```promql
-sum(rate(api_errors_total[1m]))
-/
-clamp_min(sum(rate(api_requests_total[1m])), 1e-9)
-```
-
-p95 задержки:
-
-```promql
-histogram_quantile(
-  0.95,
-  sum by (le) (rate(api_request_duration_seconds_bucket[5m]))
-)
-```
+PromQL:
 
 Память контейнера в MiB:
 
@@ -270,55 +239,38 @@ rate(container_cpu_usage_seconds_total{name="mydocker-api-gvisor"}[1m]) * 100
 rate(container_cpu_usage_seconds_total{name="mydocker-api-gvisor"}[1m])
 ```
 
-Метрики throttling проверялись через `container_cpu_cfs_throttled_periods_total`. В текущем окружении эта метрика доступна для других контейнеров, но не для `mydocker-api-gvisor`; поэтому её не следует считать работающей панелью для данного контейнера.
+Метрики throttling проверялись через `container_cpu_cfs_throttled_periods_total`.
 
-## 14. Правила оповещений
 
-Правила находятся в `prometheus/rules/alerts.yml`:
-
-- **HighErrorRate** — доля ошибок API превышает 5% в течение 30 секунд. Помогает обнаружить массовые сбои запросов.
-- **HighRequestLatency** — p95 задержки превышает 1 секунду в течение 30 секунд. Помогает обнаружить замедление обслуживания запросов.
-- **ApiDown** — Prometheus не может получить метрики API в течение 15 секунд. Позволяет обнаружить недоступность сервиса или сборщика метрик.
-
-Проверить правила и активные оповещения можно в Prometheus:
-
-- <http://localhost:9090/rules>
-- <http://localhost:9090/alerts>
-
-Правило `HighErrorRate` проверялось тестовыми запросами к `/fail`. CPU throttling дополнительно подтверждался в тесте cgroups через `cpu.stat`, но отдельное Prometheus-оповещение по throttling для gVisor в текущей конфигурации не настроено.
-
-## 15. Проверка состояния стека
-
-```bash
-cd ~/labs/lab1
-docker ps -a
-docker compose ps
-```
-
-Проверить API и метрики:
-
-```bash
-curl -i --max-time 5 http://127.0.0.1:8001/health
-curl -s http://127.0.0.1:8001/metrics | head
-```
-
-## 16. Скриншоты для отчёта
+## 14. Скриншоты для отчёта
 
 Рекомендуется приложить сделанные во время работы скриншоты:
 
 1. PID namespace и PID 1.
+<img width="1106" height="443" alt="2" src="https://github.com/user-attachments/assets/b7039f5e-9017-4c13-9a82-f4c043731723" />
+
 2. Изоляция network namespace.
-3. User namespace.
-4. Контроллеры и лимиты cgroups.
-5. CPU throttling (`cpu.stat`).
-6. OOM при превышении лимита памяти (`memory.events`).
-7. Ограничение числа процессов (`pids.max`).
-8. Запуск и проверка `mydocker.sh`.
-9. Проверка capabilities и запрета системного вызова seccomp.
-10. Сборка Docker-образа и его размер.
-11. Работа API и `docker stats` с лимитами.
-12. Проверка volume.
-13. Установка и запуск gVisor, подтверждение `Runtime=runsc`.
-14. Prometheus targets и правила оповещений.
-15. Тест срабатывания `HighErrorRate`.
-16. Итоговый дашборд Grafana с метриками API и контейнера.
+<img width="678" height="156" alt="5" src="https://github.com/user-attachments/assets/beadd6bb-79bd-494a-846a-0fc4e8bd4b5c" />
+
+3. Лимиты cgroups.
+<img width="865" height="131" alt="8" src="https://github.com/user-attachments/assets/26b3c89d-bc5b-4dfe-9583-3849832a27b2" />
+
+4. CPU throttling (`cpu.stat`).
+<img width="1321" height="378" alt="9" src="https://github.com/user-attachments/assets/9dd357e3-7576-4676-812a-cc47a5712854" />
+
+5. OOM при превышении лимита памяти (`memory.events`).
+<img width="1347" height="454" alt="10" src="https://github.com/user-attachments/assets/01164923-9232-4cf1-bcfd-d63e382b99c4" />
+
+6. Запуск и проверка `mydocker.sh`.
+<img width="1177" height="280" alt="11" src="https://github.com/user-attachments/assets/295e7be1-9bcf-4f0d-9d16-7007bdf3ca82" />
+
+7. Проверка capabilities и запрета системного вызова seccomp.
+<img width="1043" height="177" alt="12" src="https://github.com/user-attachments/assets/3fd3558a-379a-4118-9750-7a0722c78ef4" />
+<img width="1347" height="195" alt="13" src="https://github.com/user-attachments/assets/91da9af6-e297-4e65-b8cb-6c9c9cb60441" />
+<img width="1210" height="79" alt="16" src="https://github.com/user-attachments/assets/cf566128-b0f9-4c2b-ae9d-d80da79e40fe" />
+
+8. Сборка Docker-образа и его размер.
+<img width="1340" height="216" alt="15" src="https://github.com/user-attachments/assets/c75096ed-5a9e-401f-a243-8b916b7bcda8" />
+
+9. Итоговый дашборд Grafana с метриками API и контейнера.
+<img width="1864" height="982" alt="17" src="https://github.com/user-attachments/assets/f25c97e9-997f-4741-b5e3-796570d574b4" />
