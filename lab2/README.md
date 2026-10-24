@@ -2,16 +2,16 @@
 
 ## 1. Архитектура
 
--   **API (FastAPI)** --- тестовый сервис с эндпоинтами `/health`,
+-   **API (FastAPI)** - тестовый сервис с эндпоинтами `/health`,
     `/fail`, `/slow`, `/load` и `/metrics`.
--   **Prometheus** --- сбор и хранение метрик.
--   **Grafana** --- визуализация метрик и просмотр логов.
--   **Loki** --- хранение логов.
--   **Grafana Alloy** --- сбор логов Kubernetes и отправка в Loki.
--   **Jaeger** --- просмотр распределённых трасс, передаваемых через
+-   **Prometheus** - сбор и хранение метрик.
+-   **Grafana** - визуализация метрик и просмотр логов.
+-   **Loki** - хранение логов.
+-   **Grafana Alloy** - сбор логов Kubernetes и отправка в Loki.
+-   **Jaeger** - просмотр распределённых трасс, передаваемых через
     OpenTelemetry.
--   **Alertmanager** --- обработка оповещений Prometheus.
--   **Karma** --- веб-интерфейс для просмотра оповещений Alertmanager.
+-   **Alertmanager** - обработка оповещений Prometheus.
+-   **Karma** - веб-интерфейс для просмотра оповещений Alertmanager.
 
 ## 2. Структура проекта
 
@@ -115,9 +115,9 @@ kubectl port-forward -n monitoring service/monitoring-grafana 3000:80
 Перейти на <http://localhost:3000>. Использовать учётные данные,
 заданные в `prometheus/values.yaml`.
 
-RED-дашборд содержит: - **RPS** --- число запросов в секунду; - **Error
-rate** --- долю ошибок; - **p95 latency** --- 95-й перцентиль времени
-ответа; - **Total requests** --- общее количество запросов.
+RED-дашборд содержит: - **RPS** - число запросов в секунду; - **Error
+rate** - долю ошибок; - **p95 latency** - 95-й перцентиль времени
+ответа; - **Total requests** - общее количество запросов.
 
 Запросы PromQL:
 
@@ -209,9 +209,9 @@ kubectl get prometheusrules -n monitoring
 kubectl get prometheusrule api-alert-rules -n monitoring
 ```
 
-В проекте определены правила: - `HighErrorRate` --- доля HTTP 5xx
-превышает 5%; - `HighRequestLatency` --- p95 задержки превышает 1
-секунду; - `ApiDown` --- метрики API недоступны для Prometheus.
+В проекте определены правила: - `HighErrorRate` - доля HTTP 5xx
+превышает 5%; - `HighRequestLatency` - p95 задержки превышает 1
+секунду; - `ApiDown` - метрики API недоступны для Prometheus.
 
 Проверить правила в Prometheus: <http://localhost:9090/rules> и активные
 оповещения: <http://localhost:9090/alerts>.
@@ -249,29 +249,31 @@ kubectl get svc -n monitoring
 kubectl get prometheusrules -n monitoring
 ```
 
-## 12. Скриншоты для отчёта
+## 12. Скриншоты
 
 Рекомендуется приложить следующие скриншоты:
 
 1.  **Kubernetes**
+<img width="865" height="269" alt="Kuber" src="https://github.com/user-attachments/assets/6546fd21-8338-4b4b-8474-bcbbe94326f8" />
+
 2.  **Grafana RED dashboard**
+<img width="1912" height="1028" alt="RED_Grafana" src="https://github.com/user-attachments/assets/eaaa9749-e7bc-459c-8f04-4dacf72a0065" />
+
 3.  **Loki в Grafana Explore**
+<img width="1916" height="1028" alt="loki_logs" src="https://github.com/user-attachments/assets/c37df20c-75ae-4dec-b049-28681a1e9be2" />
+
 4.  **Jaeger**
+<img width="1916" height="1028" alt="jaeger" src="https://github.com/user-attachments/assets/a300acb3-76fa-4cb2-bfdd-9bcdbdfff428" />
+<img width="1865" height="985" alt="Jaeger_slow" src="https://github.com/user-attachments/assets/72f50efb-35c6-4a9e-824f-09dbba2fde3e" />
+<img width="1865" height="990" alt="Jaeger_fail" src="https://github.com/user-attachments/assets/37711f61-b3e1-4b25-8b38-380afb0af615" />
+
+
 5.  **Prometheus Rules**
+<img width="1917" height="1028" alt="api_alerts_prometheus" src="https://github.com/user-attachments/assets/6519feae-a32f-408b-bab6-e0eff911afe8" />
+
 6. **Alertmanager**
+<img width="1863" height="993" alt="alertmanager" src="https://github.com/user-attachments/assets/f40639f5-7c73-4631-af58-b12578ad496c" />
+
 7.  **Karma**
+<img width="1917" height="1028" alt="karma" src="https://github.com/user-attachments/assets/743deb3b-2f2c-412b-a3d8-1f89a8e687af" />
 
-## 13. Примечания
-
--   Запрос `/fail` предназначен для тестирования и намеренно возвращает
-    HTTP 500.
--   Loki настроен с временным хранилищем `emptyDir`; логи могут быть
-    потеряны при пересоздании Pod.
--   Jaeger использует хранилище в памяти; трассы могут исчезнуть после
-    перезапуска.
--   Команды `kubectl port-forward` работают, пока соответствующий
-    процесс остаётся запущенным в терминале.
--   В локальном кластере `kind` часть предупреждений о системных
-    компонентах может появляться из-за особенностей окружения. В отчёте
-    следует отдельно указывать результаты проверки собственных правил
-    API.
